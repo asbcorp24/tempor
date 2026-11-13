@@ -93,37 +93,60 @@ def clean_text(element):
 
 
 def parse_movie(html, url):
+    """Extract full plot and separate Cut to the Chase ending from a movie page."""
     soup = BeautifulSoup(html, 'html.parser')
-    title_node = soup.select_one('h1.entry-title, h1.post-title, article h1, h1')
-    title = title_node.get_text(' ', strip=True) if title_node else ''
-    if not title:
-        meta = soup.select_one('meta[property="og:title"]')
-        title = meta.get('content', '').strip() if meta else ''
-    title = re.sub(r'\s*[|–-]\s*The Movie Spoiler.*$', '', title, flags=re.I).strip()
-    # Prefer the WordPress article body; never fall back to the entire page.
-    content = next((soup.select_one(selector) for selector in (
-        'article .entry-content', '.single .entry-content', '.entry-content',
-        'article .post-content', '.post-content', 'article .content',
-        '.movie-content', '.movie-spoiler-content'
-    ) if soup.select_one(selector) is not None), None)
-    if content is None:
+    article = soup.select_one('article.type-movies, article.movies')
+    if article is None:
         return None
-    for bad in content.select('script,style,nav,aside,form,.crp_related,.sharedaddy,.yarpp-related,.adsbygoogle'):
-        bad.decompose()
-    text = clean_text(content)
-    if len(text) < 150 or not title:
+    content = article.select_one('.entry-content')
+    title_node = content.select_one('h1.entry-title') if content else None
+    if content is None or title_node is None:
+        return None
+    title = title_node.get_text(' ', strip=True)
+    poster_node = article.select_one('.post-thumbnail img')
+    poster = ''
+    if poster_node:
+        poster = urljoin(url, poster_node.get('src', ''))
+    if not poster:
+        meta = soup.select_one('meta[property="og:image"]')
+        poster = meta.get('content', '') if meta else ''
+
+    # The actual page has a short ending section after #cut-to-the-chase.
+    # Use only direct paragraph children to avoid related-movie text.
+    paragraphs = content.find_all('p', recursive=False)
+    plot_parts, ending_parts = [], []
+    ending_started = False
+    for child in content.children:
+        if not getattr(child, 'name', None):
+            continue
+        if child.get('id') == 'cut-to-the-chase':
+            ending_started = True
+            continue
+        if child.name != 'p':
+            continue
+        # Ignore embedded trailers, ad widgets and empty paragraphs.
+        if child.find(['iframe', 'video']):
+            continue
+        value = child.get_text(' ', strip=True)
+        if not value:
+            continue
+        (ending_parts if ending_started else plot_parts).append(value)
+
+    plot = '\\n\\n'.join(plot_parts)
+    ending = '\\n\\n'.join(ending_parts)
+    if len(plot) < 150:
         return None
     date_node = soup.select_one('time[datetime]')
     published = date_node.get('datetime', '') if date_node else ''
     if not published:
         meta = soup.select_one('meta[property="article:published_time"]')
         published = meta.get('content', '') if meta else ''
-    year_match = re.search(r'\((19\d{2}|20\d{2})\)', title)
+    year_match = re.search(r'\\((19\\d{2}|20\\d{2})\\)', title)
     year = int(year_match.group(1)) if year_match else None
-    genres = [a.get_text(' ', strip=True) for a in soup.select('a[href*="/genres/"]')]
-    genres = ', '.join(dict.fromkeys(g for g in genres if g))
-    # Store full article, including any ending sections, without guessing where they start.
-    return (url, title, year, text, published, genres, datetime.now(timezone.utc).isoformat())
+    genres = ', '.join(sorted({c.removeprefix('genres-').replace('-', ' ').title()
+                               for c in article.get('class', []) if c.startswith('genres-')}))
+    return (url, title, year, plot, published, genres,
+            datetime.now(timezone.utc).isoformat(), ending, poster)
 
 
 def setup(conn):
@@ -132,6 +155,11 @@ def setup(conn):
         plot TEXT NOT NULL, published_at TEXT, genres TEXT,
         fetched_at TEXT NOT NULL
     )''')
+    columns = {row[1] for row in conn.execute('PRAGMA table_info(movies)')}
+    if 'ending' not in columns:
+        conn.execute("ALTER TABLE movies ADD COLUMN ending TEXT DEFAULT ''")
+    if 'poster_url' not in columns:
+        conn.execute("ALTER TABLE movies ADD COLUMN poster_url TEXT DEFAULT ''")
     conn.execute('CREATE INDEX IF NOT EXISTS idx_movies_title ON movies(title)')
     conn.commit()
 
@@ -172,11 +200,12 @@ def main():
             if not movie:
                 LOG.warning('[%d/%d] Could not extract article: %s', index, len(todo), url)
                 continue
-            conn.execute('''INSERT INTO movies(url,title,year,plot,published_at,genres,fetched_at)
-                            VALUES(?,?,?,?,?,?,?)
+            conn.execute('''INSERT INTO movies(url,title,year,plot,published_at,genres,fetched_at,ending,poster_url)
+                            VALUES(?,?,?,?,?,?,?,?,?)
                             ON CONFLICT(url) DO UPDATE SET title=excluded.title,year=excluded.year,
                             plot=excluded.plot,published_at=excluded.published_at,
-                            genres=excluded.genres,fetched_at=excluded.fetched_at''', movie)
+                            genres=excluded.genres,fetched_at=excluded.fetched_at,
+                            ending=excluded.ending,poster_url=excluded.poster_url''', movie)
             conn.commit()
             ok += 1
             LOG.info('[%d/%d] saved %s (%d chars)', index, len(todo), movie[1], len(movie[3]))
