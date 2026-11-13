@@ -18,12 +18,17 @@ HEADERS = {'User-Agent': 'MovieSpoilerPersonalIndexer/1.0 (respectful archival i
 LOG = logging.getLogger('spoilers')
 
 
+class AccessDenied(Exception):
+    """Server explicitly denied access to a normal page or rate-limited requests."""
+
+
+
 def fetch(session, url, delay):
     time.sleep(delay + random.uniform(0, 0.5))
     try:
         r = session.get(url, timeout=35)
         if r.status_code in (403, 429):
-            raise RuntimeError(f'Site blocked requests: HTTP {r.status_code} at {url}; stopping')
+            raise AccessDenied(f'HTTP {r.status_code} at {url}')
         r.raise_for_status()
         return r
     except requests.RequestException as e:
@@ -45,7 +50,13 @@ def sitemap_urls(session, delay):
         if url in seen or len(seen) > 250:
             continue
         seen.add(url)
-        response = fetch(session, url, delay)
+        try:
+            response = fetch(session, url, delay)
+        except AccessDenied as exc:
+            if 'HTTP 429' in str(exc):
+                raise
+            LOG.warning('Sitemap unavailable (%s); trying other sources', exc)
+            continue
         if response is None:
             continue
         try:
@@ -69,7 +80,11 @@ def html_urls(session, delay, max_pages):
     found = set()
     for page in range(1, max_pages + 1):
         url = BASE if page == 1 else urljoin(BASE, f'page/{page}/')
-        response = fetch(session, url, delay)
+        try:
+            response = fetch(session, url, delay)
+        except AccessDenied as exc:
+            LOG.error('Archive access denied: %s. Stopping; no bypass attempted.', exc)
+            break
         if response is None:
             break
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -178,10 +193,15 @@ def main():
     with requests.Session() as session, sqlite3.connect(args.db) as conn:
         session.headers.update(HEADERS)
         setup(conn)
-        urls = sitemap_urls(session, args.delay)
-        LOG.info('Sitemaps: %d movie URLs', len(urls))
-        if not urls:
-            urls = html_urls(session, args.delay, args.pages)
+        try:
+            urls = sitemap_urls(session, args.delay)
+            LOG.info('Sitemaps: %d movie URLs', len(urls))
+            if not urls:
+                LOG.info('No sitemap links; trying public HTML archive')
+                urls = html_urls(session, args.delay, args.pages)
+        except AccessDenied as exc:
+            LOG.error('Request rate-limited or denied: %s. Stopping.', exc)
+            return
         if not urls:
             LOG.error('No movie URLs found. Check site layout/access; nothing saved.')
             return
@@ -192,7 +212,11 @@ def main():
         LOG.info('Found %d; saved already %d; processing %d', len(urls), len(completed), len(todo))
         ok = 0
         for index, url in enumerate(todo, 1):
-            response = fetch(session, url, args.delay)
+            try:
+                response = fetch(session, url, args.delay)
+            except AccessDenied as exc:
+                LOG.error('Access denied: %s. Stopping.', exc)
+                break
             if response is None:
                 continue
             movie = parse_movie(response.text, url)
