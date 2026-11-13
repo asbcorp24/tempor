@@ -1,4 +1,4 @@
-import os,sys,sqlite3,datetime,xml.etree.ElementTree as ET
+import os,sys,sqlite3,datetime,threading,time,webbrowser,urllib.request,xml.etree.ElementTree as ET
 from flask import Flask,request,redirect,jsonify,render_template
 from werkzeug.utils import secure_filename
 BASE=os.path.dirname(os.path.abspath(sys.executable)) if getattr(sys,'frozen',False) else os.path.dirname(os.path.abspath(__file__))
@@ -104,4 +104,19 @@ def week():
 @app.get('/tv')
 def tv():return render_template('tv.html')
 init()
-if __name__=='__main__':app.run(host='0.0.0.0',port=int(os.environ.get('PORT','5000')))
+def open_tv_when_ready(port):
+ url=f'http://localhost:{port}/tv'
+ for _ in range(60):
+  try:
+   with urllib.request.urlopen(url,timeout=1) as response:
+    if response.status==200:
+     webbrowser.open(url,new=1)
+     return
+  except Exception:
+   time.sleep(0.5)
+
+if __name__=='__main__':
+ port=int(os.environ.get('PORT','5000'))
+ if os.environ.get('COLLEGE_TV_NO_BROWSER','').lower() not in ('1','true','yes'):
+  threading.Thread(target=open_tv_when_ready,args=(port,),daemon=True).start()
+ app.run(host='0.0.0.0',port=port,use_reloader=False)
