@@ -131,8 +131,8 @@ def parse_movie(html, url):
             continue
         (ending_parts if ending_started else plot_parts).append(value)
 
-    plot = '\\n\\n'.join(plot_parts)
-    ending = '\\n\\n'.join(ending_parts)
+    plot = '\n\n'.join(plot_parts)
+    ending = '\n\n'.join(ending_parts)
     if len(plot) < 150:
         return None
     date_node = soup.select_one('time[datetime]')
@@ -140,7 +140,7 @@ def parse_movie(html, url):
     if not published:
         meta = soup.select_one('meta[property="article:published_time"]')
         published = meta.get('content', '') if meta else ''
-    year_match = re.search(r'\\((19\\d{2}|20\\d{2})\\)', title)
+    year_match = re.search(r'\((19\d{2}|20\d{2})\)', title)
     year = int(year_match.group(1)) if year_match else None
     genres = ', '.join(sorted({c.removeprefix('genres-').replace('-', ' ').title()
                                for c in article.get('class', []) if c.startswith('genres-')}))
