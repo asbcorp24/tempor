@@ -1,8 +1,10 @@
-import os,sqlite3,datetime,xml.etree.ElementTree as ET
+import os,sys,sqlite3,datetime,xml.etree.ElementTree as ET
 from flask import Flask,request,redirect,jsonify,render_template
 from werkzeug.utils import secure_filename
-BASE=os.path.dirname(__file__); DB=os.environ.get('SCHEDULE_DB',os.path.join(BASE,'schedule.db'))
-app=Flask(__name__);app.config['MAX_CONTENT_LENGTH']=30*1024*1024
+BASE=os.path.dirname(os.path.abspath(sys.executable)) if getattr(sys,'frozen',False) else os.path.dirname(os.path.abspath(__file__))
+ASSETS=getattr(sys,'_MEIPASS',BASE)
+DB=os.environ.get('SCHEDULE_DB',os.path.join(BASE,'schedule.db'))
+app=Flask(__name__,template_folder=os.path.join(ASSETS,'templates'));app.config['MAX_CONTENT_LENGTH']=30*1024*1024
 
 def connect():
  c=sqlite3.connect(DB);c.row_factory=sqlite3.Row;return c
