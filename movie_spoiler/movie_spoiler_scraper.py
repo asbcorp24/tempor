@@ -113,7 +113,6 @@ def parse_movie(html, url):
 
     # The actual page has a short ending section after #cut-to-the-chase.
     # Use only direct paragraph children to avoid related-movie text.
-    paragraphs = content.find_all('p', recursive=False)
     plot_parts, ending_parts = [], []
     ending_started = False
     for child in content.children:
