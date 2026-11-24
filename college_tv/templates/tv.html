@@ -1,15 +1,16 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Расписание на неделю</title><style>
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#091523;color:#eff6ff;font-family:Arial,Helvetica,sans-serif}#screen{width:100vw;height:100vh;padding:12px 17px;display:flex;flex-direction:column;gap:9px}header{display:flex;justify-content:space-between;align-items:center;min-height:65px}h1{margin:0;font-size:32px;letter-spacing:1px}.subtitle{color:#a7c9e5;font-size:19px;margin-top:3px}#clock{font-size:36px;font-weight:700}.schedule{flex:1;min-height:0;display:grid;grid-template-rows:47px repeat(8,minmax(0,1fr));gap:4px}.schedule-row{display:grid;grid-template-columns:100px repeat(6,minmax(0,1fr));gap:4px;min-height:0}.head-cell{background:#1d4768;color:#d8f2ff;font-weight:bold;display:flex;justify-content:center;align-items:center;font-size:18px;border-radius:5px}.group-name{background:#1d4768;border-radius:5px;display:flex;justify-content:center;align-items:center;font-size:24px;font-weight:800}.day-cell{background:#142c43;border:1px solid #2a4b66;border-radius:5px;overflow:hidden;padding:3px 5px;display:flex;flex-direction:column;justify-content:flex-start;gap:1px}.entry{font-size:clamp(10px,.70vw,14px);line-height:1.12;display:flex;align-items:center;gap:3px;border-bottom:1px solid #29435a;padding:1px 0;min-height:0;flex:none;white-space:nowrap;overflow:hidden;height:17px}.entry:last-child{border:0}.entry.split{display:grid;grid-template-columns:23px minmax(0,1fr);gap:2px}.parts{display:grid;grid-template-columns:repeat(var(--parts),minmax(0,1fr));min-width:0;overflow:hidden}.part{min-width:0;overflow:hidden;display:flex;align-items:center;gap:3px;padding:0 3px;border-left:1px solid #52758d}.part:first-child{border-left:0}.part .subject{display:inline}.part .meta{white-space:nowrap}.part .subgroup{font-size:.88em}.entry-body{min-width:0;overflow:hidden;display:flex;align-items:center;gap:3px}.more{font-size:12px;color:#ffd98b;font-weight:700;flex:none;padding-top:2px}.num{font-weight:800;color:#69cfff;flex:none}.subject{font-weight:600;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.meta{color:#f8e8ab;font-size:.88em;flex:none;font-weight:800;border-radius:2px;background:#2b4b61;padding:0 2px}.subgroup{color:#ffdc83;font-weight:800;flex:none}.empty{color:#55748b;text-align:center;padding-top:12px}.week-controls{display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap}.week-controls button{background:#23465e;color:#e7f6ff;border:1px solid #47718c;border-radius:5px;font:600 12px Arial,sans-serif;padding:4px 7px;cursor:pointer;min-height:24px}.admin-link{display:inline-flex;align-items:center;justify-content:center;padding:4px 7px;min-height:24px;border:1px solid #47718c;border-radius:5px;background:#23465e;color:#e7f6ff;text-decoration:none;font:600 12px Arial,sans-serif}.admin-link:hover,.admin-link:focus-visible{background:#386a8b}.week-controls button:hover,.week-controls button:focus-visible{background:#386a8b}.week-controls button:focus-visible{outline:2px solid #a8e9ff}.week-controls button:disabled{opacity:.4;cursor:default}footer{height:26px;display:flex;justify-content:space-between;align-items:center;color:#a8c4d8;font-size:16px}.progress{width:26%;height:5px;border-radius:4px;background:#284760;overflow:hidden}.bar{height:100%;background:#55c8ff;animation:fill 15s linear infinite}@keyframes fill{from{width:0}to{width:100%}}
-</style></head><body><div id="screen"><header><div><h1>РАСПИСАНИЕ ЗАНЯТИЙ НА НЕДЕЛЮ</h1><div class="subtitle" id="week"></div></div><div class="week-controls" aria-label="Выбор недели"><button id="prev" type="button" title="Предыдущая неделя">◀</button><button id="today" type="button">Текущая</button><button id="next" type="button" title="Следующая неделя">▶</button><a class="admin-link" href="/admin" title="Открыть админку">⚙</a></div><div id="clock"></div></header><main class="schedule" id="grid"></main><footer><span id="page"></span><div class="progress"><div class="bar" id="bar"></div></div><span id="updated"></span></footer></div><script>
-const $=id=>document.getElementById(id),perPage=8,pageIntervalMs=15000,names=['ПОНЕДЕЛЬНИК','ВТОРНИК','СРЕДА','ЧЕТВЕРГ','ПЯТНИЦА','СУББОТА'];let data={groups:[],times:[]},page=0,stamp='',selectedDate=null;
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Расписание на два дня</title><style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#091523;color:#eff6ff;font-family:Arial,Helvetica,sans-serif}#screen{width:100vw;height:100vh;padding:12px 17px;display:flex;flex-direction:column;gap:9px}header{display:flex;justify-content:space-between;align-items:center;min-height:65px}h1{margin:0;font-size:32px;letter-spacing:1px}.subtitle{color:#a7c9e5;font-size:19px;margin-top:3px}#clock{font-size:36px;font-weight:700}.schedule{flex:1;min-height:0;display:grid;grid-template-rows:47px repeat(8,minmax(0,1fr));gap:4px}.schedule-row{display:grid;grid-template-columns:100px repeat(2,minmax(0,1fr));gap:4px;min-height:0}.head-cell{background:#1d4768;color:#d8f2ff;font-weight:bold;display:flex;justify-content:center;align-items:center;font-size:18px;border-radius:5px}.group-name{background:#1d4768;border-radius:5px;display:flex;justify-content:center;align-items:center;font-size:24px;font-weight:800}.day-cell{background:#142c43;border:1px solid #2a4b66;border-radius:5px;overflow:hidden;padding:3px 5px;display:flex;flex-direction:column;justify-content:flex-start;gap:1px}.entry{font-size:clamp(12px,1vw,20px);line-height:1.12;display:flex;align-items:center;gap:3px;border-bottom:1px solid #29435a;padding:1px 0;min-height:0;flex:none;white-space:nowrap;overflow:hidden;height:auto;flex:1}.entry:last-child{border:0}.entry.split{display:grid;grid-template-columns:23px minmax(0,1fr);gap:2px}.parts{display:grid;grid-template-columns:repeat(var(--parts),minmax(0,1fr));min-width:0;overflow:hidden}.part{min-width:0;overflow:hidden;display:flex;align-items:center;gap:3px;padding:0 3px;border-left:1px solid #52758d}.part:first-child{border-left:0}.part .subject{display:inline}.part .meta{white-space:nowrap}.part .subgroup{font-size:.88em}.entry-body{min-width:0;overflow:hidden;display:flex;align-items:center;gap:3px}.more{font-size:12px;color:#ffd98b;font-weight:700;flex:none;padding-top:2px}.num{font-weight:800;color:#69cfff;flex:none}.subject{font-weight:600;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.meta{color:#f8e8ab;font-size:.88em;flex:none;font-weight:800;border-radius:2px;background:#2b4b61;padding:0 2px}.subgroup{color:#ffdc83;font-weight:800;flex:none}.empty{color:#55748b;text-align:center;padding-top:12px}.week-controls{display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap}.week-controls button{background:#23465e;color:#e7f6ff;border:1px solid #47718c;border-radius:5px;font:600 12px Arial,sans-serif;padding:4px 7px;cursor:pointer;min-height:24px}.admin-link{display:inline-flex;align-items:center;justify-content:center;padding:4px 7px;min-height:24px;border:1px solid #47718c;border-radius:5px;background:#23465e;color:#e7f6ff;text-decoration:none;font:600 12px Arial,sans-serif}.admin-link:hover,.admin-link:focus-visible{background:#386a8b}.week-controls button:hover,.week-controls button:focus-visible{background:#386a8b}.week-controls button:focus-visible{outline:2px solid #a8e9ff}.week-controls button:disabled{opacity:.4;cursor:default}footer{height:26px;display:flex;justify-content:space-between;align-items:center;color:#a8c4d8;font-size:16px}.progress{width:26%;height:5px;border-radius:4px;background:#284760;overflow:hidden}.bar{height:100%;background:#55c8ff;animation:fill 15s linear infinite}@keyframes fill{from{width:0}to{width:100%}}
+</style></head><body><div id="screen"><header><div><h1>РАСПИСАНИЕ ЗАНЯТИЙ</h1><div class="subtitle" id="week"></div></div><div class="week-controls" aria-label="Выбор дня"><button id="prev" type="button" title="Предыдущий день">◀</button><button id="today" type="button">Сегодня</button><button id="next" type="button" title="Следующий день">▶</button><a class="admin-link" href="/admin" title="Открыть админку">⚙</a></div><div id="clock"></div></header><main class="schedule" id="grid"></main><footer><span id="page"></span><div class="progress"><div class="bar" id="bar"></div></div><span id="updated"></span></footer></div><script>
+const $=id=>document.getElementById(id),perPage=8,pageIntervalMs=15000,names=['ВОСКРЕСЕНЬЕ','ПОНЕДЕЛЬНИК','ВТОРНИК','СРЕДА','ЧЕТВЕРГ','ПЯТНИЦА','СУББОТА'];let data={groups:[],times:[]},page=0,stamp='',selectedDate=null,followToday=true,loadedDate=null,displayDates=[];
 const isoLocal=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
 const parseLocal=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
 const initial=new URLSearchParams(location.search).get('date');
 selectedDate=(initial&&/^\d{4}-\d{2}-\d{2}$/.test(initial)&&!Number.isNaN(parseLocal(initial).getTime()))?initial:isoLocal(new Date());
-function chooseDate(date){selectedDate=date;stamp='';page=0;const url=new URL(location.href);url.searchParams.set('date',date);history.replaceState(null,'',url);refresh()}
-$('prev').addEventListener('click',()=>{const d=parseLocal(selectedDate);d.setDate(d.getDate()-7);chooseDate(isoLocal(d))});
-$('next').addEventListener('click',()=>{const d=parseLocal(selectedDate);d.setDate(d.getDate()+7);chooseDate(isoLocal(d))});
-$('today').addEventListener('click',()=>chooseDate(isoLocal(new Date())));
+followToday=!initial;
+function chooseDate(date,live=false){followToday=live;selectedDate=date;stamp='';page=0;const url=new URL(location.href);if(live)url.searchParams.delete('date');else url.searchParams.set('date',date);history.replaceState(null,'',url);refresh()}
+$('prev').addEventListener('click',()=>{const d=parseLocal(selectedDate);d.setDate(d.getDate()-1);chooseDate(isoLocal(d))});
+$('next').addEventListener('click',()=>{const d=parseLocal(selectedDate);d.setDate(d.getDate()+1);chooseDate(isoLocal(d))});
+$('today').addEventListener('click',()=>chooseDate(isoLocal(new Date()),true));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const shortDate=s=>s?s.split('-').reverse().join('.'):'';
 function lessonTitle(l){return String(l.hour)+'. '+(l.subject||'Занятие')+(l.subgroup?' п/г '+l.subgroup:'')+(l.room?' каб. '+l.room:'')}
@@ -42,24 +43,44 @@ function drawRow(row){
 function render(){
  const count=Math.max(1,Math.ceil(data.groups.length/perPage));page%=count;
  const groups=data.groups.slice(page*perPage,(page+1)*perPage);
- let html='<div class="schedule-row"><div class="head-cell">ГРУППА</div>'+names.map(n=>`<div class="head-cell">${n}</div>`).join('')+'</div>';
+ let html='<div class="schedule-row"><div class="head-cell">ГРУППА</div>'+displayDates.map((d,i)=>`<div class="head-cell">${d===isoLocal(new Date())?'СЕГОДНЯ · ':d===nextDate(isoLocal(new Date()))?'ЗАВТРА · ':''}${names[parseLocal(d).getDay()]} · ${shortDate(d)}</div>`).join('')+'</div>';
  for(const g of groups){
   html+='<div class="schedule-row"><div class="group-name">'+esc(g.name)+'</div>';
-  for(let day=1;day<=6;day++){
+  for(let day=0;day<2;day++){
    const lessons=g.days?.[String(day)]||[];
    const rows=lessonRows(lessons);
-   const visible=rows.slice(0,5);
-   html+='<div class="day-cell">'+(rows.length?visible.map(drawRow).join('')+(rows.length>5?`<div class="more">+ ещё ${rows.length-5} пар</div>`:''):'<span class="empty">—</span>')+'</div>';
+   const visible=rows;
+   html+='<div class="day-cell">'+(rows.length?visible.map(drawRow).join(''):'<span class="empty">—</span>')+'</div>';
   }
   html+='</div>';
  }
- for(let i=groups.length;i<perPage;i++)html+='<div class="schedule-row"><div class="group-name"></div>'+Array(6).fill('<div class="day-cell"></div>').join('')+'</div>';
+ for(let i=groups.length;i<perPage;i++)html+='<div class="schedule-row"><div class="group-name"></div>'+Array(2).fill('<div class="day-cell"></div>').join('')+'</div>';
  $('grid').innerHTML=html;
  $('page').textContent=`Страница ${page+1} / ${count} · 8 групп на странице`;
- $('week').textContent=`${shortDate(data.week_start)} — ${shortDate(data.week_end)}`;
+ $('week').textContent=displayDates.map(shortDate).join(' — ');
  $('updated').textContent=data.updated?'Обновлено '+data.updated.replace('T',' '):'';
  $('bar').style.animation='none';void $('bar').offsetWidth;$('bar').style.animation=`fill ${pageIntervalMs}ms linear infinite`;
 }
-async function refresh(){const date=selectedDate;try{const r=await fetch('/api/week?date='+date,{cache:'no-store'});if(!r.ok)throw Error(r.status);const v=await r.json();if(date!==selectedDate)return;const next=JSON.stringify(v);if(next!==stamp){stamp=next;data=v;page=0;render()}}catch(e){$('updated').textContent='Нет связи с сервером'}}
+function nextDate(date){const d=parseLocal(date);d.setDate(d.getDate()+1);return isoLocal(d)}
+function monday(date){const d=parseLocal(date);d.setDate(d.getDate()-((d.getDay()+6)%7));return isoLocal(d)}
+let requestId=0;
+async function refresh(){
+ if(followToday)selectedDate=isoLocal(new Date());
+ const date=selectedDate,dates=[date,nextDate(date)],id=++requestId;
+ try{
+  const weeks=[...new Set(dates.map(monday))];
+  const values=await Promise.all(weeks.map(async w=>{const r=await fetch('/api/week?date='+w,{cache:'no-store'});if(!r.ok)throw Error(r.status);return r.json()}));
+  if(id!==requestId||date!==selectedDate)return;
+  const byWeek=new Map(weeks.map((w,i)=>[w,values[i]])),groups=new Map();
+  for(const v of values)for(const g of v.groups)if(!groups.has(g.id))groups.set(g.id,{...g,days:{}});
+  for(const [i,d] of dates.entries()){
+   const v=byWeek.get(monday(d)),day=parseLocal(d).getDay()||7;
+   for(const g of v.groups)groups.get(g.id).days[String(i)]=g.days?.[String(day)]||[];
+  }
+  const v={groups:[...groups.values()],updated:values[0].updated};
+  const next=JSON.stringify([dates,v]);
+  if(next!==stamp){stamp=next;data=v;displayDates=dates;page=0;loadedDate=date;render()}
+ }catch(e){if(id===requestId)$('updated').textContent='Нет связи с сервером'}
+}
 setInterval(()=>{page++;render()},pageIntervalMs);setInterval(refresh,30000);setInterval(()=>{$('clock').textContent=new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'})},1000);refresh();
 </script></body></html>
